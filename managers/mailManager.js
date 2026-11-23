@@ -15,11 +15,14 @@
 const settings = require('./../configs/settings.json');
 const credentials = require('./../configs/env');
 const { default_headers } = require('./../configs/constants');
+const { create_logger } = require('./logManager');
 const { encode, decode } = require('html-entities');
 const fetch = require("node-fetch");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+
+const log = create_logger("mail");
 
 const MAIL_URL = settings.mail_url;
 const INBOX_URL = MAIL_URL + settings.mail_inbox_path;
@@ -91,7 +94,7 @@ async function request(jar, url, options = {}, attempts = 3) {
         } catch (error) {
             last_error = error;
             if (attempt === attempts) throw error;
-            console.log(`Network error (${error.message}) — retry ${attempt + 1}/${attempts}...`);
+            log.warn(`network error (${error.message}) — retry ${attempt + 1}/${attempts}...`);
             await new Promise(resolve => setTimeout(resolve, attempt * 2000));
         }
     }
@@ -182,7 +185,7 @@ async function sso_login(jar, identifiant, mot_de_passe) {
     let url = landing.url;
     let status = landing.status;
     let page = landing.text;
-    console.log(`   mail SSO page: ${url} (HTTP ${status})`);
+    log.debug(`sso: landing on ${url} (HTTP ${status})`);
     if (status !== 200) throw new Error(`webmail unreachable: HTTP ${status}`);
 
     const identical_posts = {};
@@ -194,7 +197,7 @@ async function sso_login(jar, identifiant, mot_de_passe) {
         if (form_saml) {
             // One-shot POST (the SP has replay detection): never retried.
             const target = new URL(form_saml.action || url, url).toString();
-            console.log(`   [${step}] posting the SAML response -> ${target}`);
+            log.debug(`[${step}] posting the SAML response -> ${target}`);
             const outcome = await submit(jar, target, form_saml.fields, 1);
             url = outcome.url; status = outcome.status; page = outcome.text;
             if (url.startsWith(MAIL_URL) && status === 200) return url;
@@ -221,7 +224,7 @@ async function sso_login(jar, identifiant, mot_de_passe) {
             data[pass_field] = mot_de_passe;
             if ("execution" in form_login.fields) data.execution = form_login.fields.execution;
             if ("_eventId" in form_login.fields) data._eventId = form_login.fields._eventId;
-            console.log(`   [${step}] sending credentials -> ${target}`);
+            log.debug(`[${step}] sending credentials -> ${target}`);
             // Credentials are sent exactly once (network errors included):
             // resending them on a flaky network is how accounts get locked.
             const outcome = await submit(jar, target, data, 1);
@@ -242,7 +245,7 @@ async function sso_login(jar, identifiant, mot_de_passe) {
                 throw new Error("the IdP keeps re-displaying the same form (consent?)");
             }
             const detail = other.notes.length ? ` (${other.notes.join(", ")})` : "";
-            console.log(`   [${step}] intermediate step${detail} -> ${target}`);
+            log.debug(`[${step}] intermediate step${detail} -> ${target}`);
             const outcome = await submit(jar, target, other.fields, 2);
             url = outcome.url; status = outcome.status; page = outcome.text;
             continue;
@@ -312,8 +315,8 @@ function lock_auth() {
         fingerprint: fingerprint(credentials.password),
         at: new Date().toISOString()
     }), "utf8");
-    console.error("   ✗ credentials refused — mail SSO LOCKED.");
-    console.error(`     Fix CYU_PASSWORD in .env, then delete ${BLOCKED_FILE} to retry.`);
+    log.error("credentials refused — mail SSO LOCKED");
+    log.error(`fix the password in .env, then delete ${BLOCKED_FILE} to retry`);
 }
 
 // MARK: - Zimbra calls
@@ -357,7 +360,7 @@ function attr_of(tag, name) {
 async function fetch_full_message(jar, id) {
     const outcome = await soap(jar, token_of(jar), `<GetMsgRequest xmlns="urn:zimbraMail"><m id="${id}"/></GetMsgRequest>`);
     if (outcome.code !== 200 || !outcome.text.includes("GetMsgResponse")) {
-        console.error(`   cannot fetch message ${id} (HTTP ${outcome.code})`);
+        log.error(`cannot fetch message ${id} (HTTP ${outcome.code})`);
         return null;
     }
 
@@ -442,7 +445,7 @@ async function forward_message(jar, token, full) {
 
     const outcome = await soap(jar, token, request);
     if (outcome.code === 200 && outcome.text.includes("SendMsgResponse")) return true;
-    console.error(`   transfer failed (HTTP ${outcome.code}): ${String(outcome.text).replace(/[<>]/g, "").slice(0, 150)}`);
+    log.error(`transfer failed (HTTP ${outcome.code}): ${String(outcome.text).replace(/[<>]/g, "").slice(0, 150)}`);
     return false;
 }
 
@@ -464,7 +467,7 @@ async function check_mail() {
     let inbox = await fetch_inbox(jar);
 
     if (inbox.status !== 200) {
-        console.log("   mailbox session missing/expired — SSO login...");
+        log.info("no valid session — SSO login...");
         try {
             jar = await sso_login_and_save();
         } catch (error) {
@@ -479,7 +482,7 @@ async function check_mail() {
     if (seen === null) {
         // First run: mark everything as seen, no transfer flood.
         save_seen(inbox.messages.map(m => m.id));
-        console.log(`   first run: ${inbox.messages.length} existing message(s) marked as seen (no flood)`);
+        log.info(`first run: ${inbox.messages.length} existing message(s) marked as seen (no flood)`);
         return;
     }
 
@@ -487,15 +490,15 @@ async function check_mail() {
     const unread = fresh_ones.filter(m => String(m.f || "").includes("u"));
     if (!unread.length) {
         if (fresh_ones.length) {
-            console.log(`   ${fresh_ones.length} message(s) already read on the webmail — nothing to report`);
+            log.info(`${fresh_ones.length} message(s) already read on the webmail — nothing to transfer`);
         } else {
-            console.log("   no new message");
+            log.info("no new message");
         }
         save_seen(seen.concat(fresh_ones.map(m => m.id)));
         return;
     }
 
-    console.log(`   ${unread.length} new unread message(s) -> transfer(s)`);
+    log.info(`${unread.length} new unread message(s) -> transfer(s)`);
     for (const message of unread.slice(0, NOTIFY_LIMIT).reverse()) {
         const full = await fetch_full_message(jar, message.id);
         if (!full) continue;
@@ -503,11 +506,11 @@ async function check_mail() {
         full.subject = full.subject || message.su || "";
         full.date = full.date || message.d || "";
         if (await forward_message(jar, token_of(jar), full)) {
-            console.log(`   transfer sent: ${full.subject || "(no subject)"}`);
+            log.info(`transferred: ${full.subject || "(no subject)"}`);
             seen.push(message.id);
             save_seen(seen);
         } else {
-            console.error(`   transfer failed for ${message.id} — will retry next tick`);
+            log.error(`transfer failed for ${message.id} — will retry next tick`);
         }
     }
 }

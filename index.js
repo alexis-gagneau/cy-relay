@@ -1,102 +1,74 @@
-const fs = require('fs');
-const path = require('path');
-
 const { event_scrapper } = require('./services//scrappingService');
 const { generateICSCalendars } = require('./managers/calendarStoreManager');
 const { check_mail, send_test_notification } = require('./managers/mailManager');
+const { create_logger } = require('./managers/logManager');
 
-const logDirectory = './logs';
-const logFile = path.join(logDirectory, 'celcat.log');
-const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB before rotating
+const pkg = require('./package.json');
+const log = create_logger('core');
 
-if (!fs.existsSync(logDirectory)) {
-    fs.mkdirSync(logDirectory, { recursive: true });
-}
-
-// Simple rotation: archive the current log when it grows too big.
-if (fs.existsSync(logFile) && fs.statSync(logFile).size > MAX_LOG_SIZE) {
-    fs.renameSync(logFile, `${logFile}.${new Date().toISOString().replace(/[:.]/g, '-')}.old`);
-}
-
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
-
-function formatLog(message) {
-    const now = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
-    return `[${now}] ${message}\n`;
-}
-
-// Join every argument (Errors print their message/stack), so nothing is lost.
-function logText(args) {
-    return Array.from(args)
-        .map(arg => arg instanceof Error ? (arg.stack || arg.message) : String(arg))
-        .join(' ');
-}
-
-// Logs go to the file AND to stdout/stderr, so `docker logs` shows them too.
-console.log = function() {
-    const line = formatLog(logText(arguments));
-    logStream.write(line);
-    process.stdout.write(line);
-};
-
-console.error = function() {
-    const line = formatLog(`ERROR: ${logText(arguments)}`);
-    logStream.write(line);
-    process.stderr.write(line);
-};
-
-// Never die silently: log the failure, then exit non-zero.
-process.on('unhandledRejection', reason => {
-    console.error(`Unhandled rejection: ${reason instanceof Error ? reason.message : reason}`);
-    process.exitCode = 1;
-});
-
-async function main() {
-    console.log('Starting Celcat scraping...');
-    let calendar = await event_scrapper();
-    generateICSCalendars(calendar);
-    console.log('Celcat scraping completed.');
-
-    // Mail relay: a mail failure must never kill the timetable run.
-    console.log('Checking the CYU mailbox...');
-    try {
-        await check_mail();
-    } catch (error) {
-        console.error(`Mail check failed: ${error.message}`);
-    }
-    console.log('######################');
-}
+log.info(`${pkg.name} v${pkg.version} — node ${process.version}, Europe/Paris`);
 
 // --- Scheduling -------------------------------------------------------------
 // Set SCHEDULE in .env (cron syntax, e.g. "*/10 * * * *") to keep the process
 // alive and re-scrape automatically (Europe/Paris). Without it, the app runs
 // once and exits — perfect for an external cron job.
 const SCHEDULE = process.env.SCHEDULE;
+log.info(SCHEDULE ? `schedule: "${SCHEDULE}"` : 'schedule: none — single run then exit');
+
+const MAIL_ENABLED = Boolean(process.env.MAIL_ADDRESS && process.env.MAIL_NOTIFY_TO);
+log.info(MAIL_ENABLED ? `mail relay: enabled -> ${process.env.MAIL_NOTIFY_TO}` : 'mail relay: disabled (MAIL_ADDRESS / MAIL_NOTIFY_TO not set)');
+
+let runCount = 0;
+
+async function main() {
+    const runId = ++runCount;
+    const startedAt = Date.now();
+    log.info(`── run #${runId} started ──`);
+
+    let calendar = await event_scrapper();
+    generateICSCalendars(calendar);
+
+    // Mail relay: a mail failure must never kill the timetable run.
+    if (MAIL_ENABLED) {
+        try {
+            await check_mail();
+        } catch (error) {
+            log.error(`mail check failed: ${error.message}`);
+        }
+    }
+
+    log.info(`── run #${runId} completed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s ──`);
+}
 
 // `node index.js --test-mail` transfers a test message to MAIL_NOTIFY_TO.
 if (process.argv.includes('--test-mail')) {
     send_test_notification().then(ok => {
-        console.log(ok ? 'Test message transferred.' : 'Test transfer FAILED.');
+        log[ok ? 'info' : 'error'](ok ? 'test transfer sent' : 'test transfer FAILED');
         process.exit(ok ? 0 : 1);
     }).catch(error => {
-        console.error('Fatal:', error.message);
+        log.error(`fatal: ${error.message}`);
         process.exit(1);
     });
 } else if (SCHEDULE) {
     const cron = require('node-cron');
 
     if (!cron.validate(SCHEDULE)) {
-        console.error(`Invalid SCHEDULE: "${SCHEDULE}"`);
+        log.error(`invalid SCHEDULE: "${SCHEDULE}"`);
         process.exit(1);
     }
 
-    console.log(`Schedule: "${SCHEDULE}" (Europe/Paris) — running now, then on schedule.`);
-    const run = () => main().catch(error => console.error('Fatal:', error.message));
+    const run = () => main().catch(error => log.error(`run #${runCount} fatal: ${error.message}`));
     run();
     cron.schedule(SCHEDULE, run);
 } else {
     main().catch(error => {
-        console.error('Fatal:', error.message);
+        log.error(`fatal: ${error.message}`);
         process.exit(1);
     });
 }
+
+// Never die silently: log the failure, then flag the process as failed.
+process.on('unhandledRejection', reason => {
+    log.error(`unhandled rejection: ${reason instanceof Error ? reason.message : reason}`);
+    process.exitCode = 1;
+});

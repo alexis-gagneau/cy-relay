@@ -1,15 +1,18 @@
 const settings = require('./../configs/settings.json');
 const { event_type, begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_tp, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar } = require('./../configs/constants');
+const { create_logger } = require('./logManager');
 
 const fs = require("fs");
 const path = require("path");
+
+const log = create_logger("celcat");
 
 function write_ics(file, content) {
     try {
         fs.writeFileSync(file, content, "utf8");
     } catch (error) {
         // VirtioFS/Docker mounts can briefly refuse writes (EPERM): one retry.
-        console.error(`Write failed on ${file} (${error.message}) — retrying once...`);
+        log.warn(`write failed on ${file} (${error.message}) — retrying once...`);
         fs.writeFileSync(file, content, "utf8");
     }
 }
@@ -75,7 +78,7 @@ function generateICSCalendars(calendar) {
     write_ics(`${settings.ics_path}_exams.ics`, icsCalendar_exams);
     write_ics(`${settings.ics_path}_others.ics`, icsCalendar_others);
 
-    console.log("file saved.");
+    log.info(`ICS calendars written to ${path.dirname(settings.ics_path)} (${calendar.length} event(s))`);
 }
 
 module.exports = { generateICSCalendars };

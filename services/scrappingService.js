@@ -1,7 +1,10 @@
 const settings = require('./../configs/settings.json');
 const { event_shapper } = require('./../managers/eventShapeManager');
 const { do_request, data_request } = require('./../managers/networkManager');
+const { create_logger } = require('./../managers/logManager');
 const { stringToDate } = require('./../utils/dateUtils');
+
+const log = create_logger("celcat");
 
 async function event_scrapper() {
     let celcatEvents = await data_request(settings.calendarData_url);
@@ -13,7 +16,7 @@ async function event_scrapper() {
             sidebar_elements = await fetch_sidebar_data(celcatEvent.id);
         } catch (error) {
             // One flaky sidebar request should not kill the whole run.
-            console.error(`Sidebar KO for event ${celcatEvent.id} — event skipped (${error.message})`);
+            log.error(`sidebar KO for event ${celcatEvent.id} — event skipped (${error.message})`);
             continue;
         }
         let shaped_event = event_shapper(celcatEvent, sidebar_elements);

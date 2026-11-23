@@ -1,9 +1,12 @@
 const settings = require('./../configs/settings.json');
 const { default_headers } = require('./../configs/constants');
 const credentials = require('./../configs/env');
+const { create_logger } = require('./logManager');
 
 const fetch = require('node-fetch');
 const moment = require('moment');
+
+const log = create_logger("celcat");
 
 // MARK: - Requests manager
 
@@ -25,7 +28,7 @@ async function do_request(url, method = "GET", headers = {}, body = null) {
             lastError = error;
             if (attempt < MAX_ATTEMPTS) {
                 let wait = attempt * 2000;
-                console.log(`Network error (${error.message}) — retry ${attempt + 1}/${MAX_ATTEMPTS} in ${wait / 1000}s...`);
+                log.warn(`network error (${error.message}) — retry ${attempt + 1}/${MAX_ATTEMPTS} in ${wait / 1000}s...`);
                 await new Promise(resolve => setTimeout(resolve, wait));
             }
         }
@@ -60,9 +63,9 @@ async function get_antiforgerystuff() {
             if (cookie && token) {
                 return [cookie.split(";")[0], token];
             }
-            console.log(`Anti-forgery incomplete (cookie: ${!!cookie}, token: ${!!token}) — retry ${attempt}/3...`);
+            log.warn(`anti-forgery incomplete (cookie: ${!!cookie}, token: ${!!token}) — retry ${attempt}/3...`);
         } else {
-            console.log(`Anti-forgery page: HTTP ${response.status} — retry ${attempt}/3...`);
+            log.warn(`anti-forgery page: HTTP ${response.status} — retry ${attempt}/3...`);
         }
 
         await new Promise(resolve => setTimeout(resolve, attempt * 2000));
@@ -78,10 +81,10 @@ function get_ac(response) {
     return cookie.split(";")[0];
 }
 async function set_sc() {
-    console.log("Reaching website.");
+    log.info(`reaching ${new URL(settings.calendar_url).host}`);
     let antiforgery_stuff = await get_antiforgerystuff();
     
-    console.log("Sign in...");
+    log.info("signing in");
     let response = await do_request(settings.signIn_url,
         "POST",
         {
