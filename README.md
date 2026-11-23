@@ -126,13 +126,6 @@ against CYU services — nothing is stored, logged or sent anywhere else. A refu
 login locks the mailbox SSO instead of retrying (the CYU directory blocks accounts
 after repeated failures).
 
-## 🤝 Credits
+## License
 
-CY Relay started as a personal project by Alexis Gagneau: the timetable scraper is
-the original hand-written core. The mailbox relay, the structured logging, the docs
-and a large part of the hardening were developed with the help of an AI coding agent
-([OpenCode](https://opencode.ai)), under human direction and review.
-
-## 📄 License
-
-[MIT](LICENSE)
+[MIT](LICENSE) · built with AI assistance
