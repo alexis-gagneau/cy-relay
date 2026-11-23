@@ -17,14 +17,18 @@ function event_shapper(celcatEvent, sidebar_elements) {
         if (sidebar_element.label === "Event category") {
             switch (sidebar_element.content) {
                 case "CM":
+                case "CM à distance":
+                case "CM par groupe de TD":
                     category = sidebar_element.content;
                     type = event_type.cm;
                     break;
                 case "TD":
+                case "TD à distance":
                     category = sidebar_element.content;
                     type = event_type.td;
                     break;
                 case "TP":
+                case "TP à distance":
                     category = sidebar_element.content;
                     type = event_type.tp;
                     break;

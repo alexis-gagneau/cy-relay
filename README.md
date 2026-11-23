@@ -17,6 +17,8 @@ Unofficial personal relay for **CY Cergy Paris Université** (CYU) student servi
   (with Apple structured locations).
 - Generates **seven ICS feeds** — full calendar, CM, TD, TP, CC, exams, other — ready to
   subscribe to from Apple Calendar, Google Calendar, or anything that speaks ICS.
+  Variants like *TD à distance* or *CM par groupe de TD* are filed under their
+  base category feed (TD à distance → TD, CM par groupe de TD → CM).
 
 ### 🚧 Mailbox relay (planned)
 
