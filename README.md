@@ -100,9 +100,12 @@ docker run --env-file .env \
 
 - **Inside the container** (recommended): set `SCHEDULE` (cron syntax, e.g.
   `*/10 * * * *`, Europe/Paris). The container stays up and re-runs on
-  schedule — no external cron needed.
-- **Outside**: leave `SCHEDULE` unset and let a cron job / systemd timer run
-  the container periodically — one run per invocation, then it exits.
+  schedule — no external cron needed. Each service can also get its own
+  cadence: `CELCAT_SCHEDULE` and `MAIL_SCHEDULE` override the `SCHEDULE`
+  default per service (the mailbox probe is a single light GET — e.g. `*/10`
+  for the timetable, `*/3` for the mailbox).
+- **Outside**: leave the schedules unset and let a cron job / systemd timer
+  run the container periodically — one run per invocation, then it exits.
 
 ## Logs
 
