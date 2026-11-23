@@ -1,7 +1,8 @@
 # CY Relay
 
 Unofficial personal relay for **CY Cergy Paris Université** (CYU) student services —
-*your CYU campus, relayed*: the CELCAT timetable today, your student mailbox next.
+*your CYU campus, relayed*: the CELCAT timetable and your student mailbox, in the
+tools you actually use.
 
 > ⚠️ **Disclaimer** — This project is not affiliated with, endorsed by, or connected to
 > CY Cergy Paris Université or RENATER. It uses the owner's own student credentials,
@@ -9,7 +10,7 @@ Unofficial personal relay for **CY Cergy Paris Université** (CYU) student servi
 
 ## What it does
 
-### ✅ Timetable → subscribable ICS feeds (current)
+### Timetable → subscribable ICS feeds
 
 - Scrapes the CYU **CELCAT** timetable (`celcat-calendar.cyu.fr`) with your own
   credentials (anti-forgery token + session cookies).
@@ -19,54 +20,73 @@ Unofficial personal relay for **CY Cergy Paris Université** (CYU) student servi
   subscribe to from Apple Calendar, Google Calendar, or anything that speaks ICS.
   Variants like *TD à distance* or *CM par groupe de TD* are filed under their
   base category feed (TD à distance → TD, CM par groupe de TD → CM).
+- Dynamic academic year (September 1 → June 30).
 
-### 🚧 Mailbox relay (planned)
+### Mailbox relay
 
 The university disables mail forwarding and direct IMAP/SMTP access on student
-mailboxes (`service.PERM_DENIED: forwarding not enabled`), so the relay will:
+mailboxes (`service.PERM_DENIED: forwarding not enabled`), so the relay replays
+the web SSO flow (Shibboleth IdP → CAS → SAML) like a browser, then polls the
+inbox through the Zimbra (RENATER Partage) REST API.
 
-- sign in through the **CYU SSO** (Shibboleth IdP → CAS → SAML), like a browser;
-- poll the inbox through the Zimbra (RENATER Partage) REST API;
-- push a notification card to a personal address for every new unread message,
-  with `Reply-To` set to the original sender(s).
+Every new **unread** message is transferred as-is to a personal address:
 
-## Project layout
+- original subject and untouched body — it reads like a mail landing directly
+  in your box, with the real sender's name shown as the From;
+- attachments re-attached, no `.eml` wrapper;
+- `Reply-To` set to the original sender(s) — answering the transfer answers
+  them, straight from your personal mailbox;
+- a single discreet line at the very bottom for traceability:
+  `Transféré par CY Relay · expéditeur d'origine : … · reçu le …`;
+- the first run marks the existing inbox as seen, so no flood on setup.
 
-```
-index.js                          entry point + file logging
-services/scrappingService.js      CELCAT scraping (calendar + per-event sidebar)
-managers/networkManager.js        HTTP + CELCAT session (anti-forgery token, cookies)
-managers/eventShapeManager.js     event shaping (titles, rooms, sites, professors)
-managers/calendarStoreManager.js  ICS generation (one feed per event category)
-configs/constants.js              event types, campus sites, ICS templates
-configs/env.js                    .env loader + credentials access
-configs/settings.json             non-secret settings (endpoints, selectors, paths)
-utils/dateUtils.js                date helpers
-```
-
-## Configuration
-
-Two files, two purposes:
-
-| File | Committed? | Contents |
-|---|---|---|
-| `.env` | ❌ never | Secrets: `CYU_ID`, `CYU_USERNAME`, `CYU_PASSWORD` |
-| `configs/settings.json` | ✅ | Non-secret settings: CELCAT endpoints, DOM selectors, ICS output path |
-
-```bash
-cp .env.example .env    # then fill in your CYU credentials
-```
+Safety rails: credentials are sent exactly once per SSO flow (never retried on
+network errors), and a refused login locks the relay until the password is
+fixed — the CYU account is never brute-forced.
 
 ## Getting started
 
 ```bash
+git clone <repo> && cd cy-relay
+cp .env.example .env    # fill in your CYU credentials
 npm install
 node index.js
 ```
 
-ICS feeds are written to the path configured in `configs/settings.json` (`ics_path`).
+Configuration lives in **one file: `.env`** (see `.env.example` for the full
+list of keys). Everything else — endpoints, selectors, output paths — is
+committed in `configs/settings.json` and only needs touching if the university
+changes its endpoints.
 
-### Docker
+Optionally set in `.env`:
+
+- `SCHEDULE` — cron syntax (e.g. `*/10 * * * *`): the process stays alive and
+  re-runs on schedule (Europe/Paris). Unset, it runs once and exits.
+- `MAIL_ADDRESS` + `MAIL_NOTIFY_TO` — enable the mailbox relay (your CYU
+  address and the personal address receiving the transfers).
+- `LOG_LEVEL` — `debug`, `info` (default), `warn` or `error`.
+
+`node index.js --test-mail` sends a test transfer to `MAIL_NOTIFY_TO`.
+
+## Output
+
+ICS feeds are written next to `ics_path` from `configs/settings.json`
+(default `/app/output/timetable`):
+
+| File | Contents |
+|---|---|
+| `timetable.ics` | every event |
+| `timetable_cm.ics` | CM |
+| `timetable_td.ics` | TD |
+| `timetable_tp.ics` | TP |
+| `timetable_cc.ics` | CC |
+| `timetable_exams.ics` | exams |
+| `timetable_others.ics` | everything else |
+
+Subscribe from your calendar app to the ones you want (all of them, or just
+TD + TP + exams).
+
+## Docker
 
 ```bash
 docker build -t cy-relay .
@@ -78,30 +98,40 @@ docker run --env-file .env \
 
 ### Scheduling
 
-Two ways to run it periodically:
-
 - **Inside the container** (recommended): set `SCHEDULE` (cron syntax, e.g.
-  `*/10 * * * *`) in `.env` or with `-e SCHEDULE="*/10 * * * *"`. The container
-  stays up and re-scrapes on schedule (Europe/Paris) — a plain
-  `docker compose up -d` replaces the external cron job.
+  `*/10 * * * *`, Europe/Paris). The container stays up and re-runs on
+  schedule — no external cron needed.
 - **Outside**: leave `SCHEDULE` unset and let a cron job / systemd timer run
-  the container every 10 minutes — one run per invocation, then it exits.
+  the container periodically — one run per invocation, then it exits.
 
-### Logs
+## Logs
 
-Logs go to **both** stdout (so `docker logs cy-relay` works) and `logs/celcat.log`.
-The log file is rotated at startup once it exceeds 5 MB (archived as `celcat.log.<date>.old`).
+Structured and component-tagged:
+
+```
+[23/11/2026 15:27:37] INFO  [core]  ── run #1 started ──
+[23/11/2026 15:27:42] INFO  [celcat] ICS calendars written to /app/output (71 event(s))
+[23/11/2026 15:27:42] INFO  [mail]  transferred: Schedule change for tomorrow
+[23/11/2026 15:27:42] INFO  [core]  ── run #1 completed in 6.2s ──
+```
+
+Levels `DEBUG` / `INFO` / `WARN` / `ERROR` (filter with `LOG_LEVEL`), components
+`[core]` (run lifecycle), `[celcat]` (timetable) and `[mail]` (relay). Logs go
+to **both** stdout (`docker logs` friendly) and `logs/cy-relay.log`, rotated at
+startup past 5 MB.
 
 ## Security
 
 - `.env` (real credentials) is **git-ignored** — never commit it.
 - Failed logins can temporarily lock a CYU directory account: never retry
-  credentials in a loop. Any automation must stop after a single rejection.
+  credentials in a loop. Any automation must stop after a single rejection —
+  this relay follows that rule (one SSO attempt per flow, auth-lock on refusal).
 
 ## Roadmap
 
 - [x] CELCAT → seven ICS feeds (one per event category, dynamic academic year)
-- [ ] Mailbox relay: CYU SSO → inbox polling → notifications with `Reply-To`
+- [x] Mailbox relay: CYU SSO → inbox polling → as-is transfers with `Reply-To`
+- [ ] Optional SMTP transport (service address) alongside the CYU sender
 - [ ] Resilient scheduling (exponential backoff, night pause)
 - [ ] Full English codebase and comments
 
