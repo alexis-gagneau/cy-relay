@@ -50,17 +50,32 @@ function get_rvt(text) {
     return text.split('<input name="__RequestVerificationToken" type="hidden" value="')[1].split('" /></form>')[0];
 }
 async function get_antiforgerystuff() {
-    let response = await do_request(settings.antiforgeryStuff_url);
-    
-    if (response.ok) {
-        return [
-            response.headers.get("set-cookie").split(";")[0],
-            get_rvt(await response.text())
-        ];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        let response = await do_request(settings.antiforgeryStuff_url);
+
+        if (response.ok) {
+            let cookie = response.headers.get("set-cookie");
+            let token = get_rvt(await response.text());
+
+            if (cookie && token) {
+                return [cookie.split(";")[0], token];
+            }
+            console.log(`Anti-forgery incomplete (cookie: ${!!cookie}, token: ${!!token}) — retry ${attempt}/3...`);
+        } else {
+            console.log(`Anti-forgery page: HTTP ${response.status} — retry ${attempt}/3...`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
     }
+
+    throw new Error("CELCAT did not return the anti-forgery token after 3 attempts");
 }
 function get_ac(response) {
-    return response.headers.get("set-cookie").split(";")[0];
+    let cookie = response.headers.get("set-cookie");
+    if (!cookie) {
+        throw new Error("No session cookie returned after login (bad credentials or CELCAT hiccup)");
+    }
+    return cookie.split(";")[0];
 }
 async function set_sc() {
     console.log("Reaching website.");

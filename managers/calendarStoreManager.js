@@ -4,6 +4,16 @@ const { event_type, begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, beg
 const fs = require("fs");
 const path = require("path");
 
+function write_ics(file, content) {
+    try {
+        fs.writeFileSync(file, content, "utf8");
+    } catch (error) {
+        // VirtioFS/Docker mounts can briefly refuse writes (EPERM): one retry.
+        console.error(`Write failed on ${file} (${error.message}) — retrying once...`);
+        fs.writeFileSync(file, content, "utf8");
+    }
+}
+
 function generateICSCalendars(calendar) {
     // Make sure the output directory exists (fresh container, first run...).
     fs.mkdirSync(path.dirname(settings.ics_path), { recursive: true });
@@ -17,12 +27,12 @@ function generateICSCalendars(calendar) {
     let icsCalendar_others = begin_VCalendar_others;
 
     calendar.forEach(event => {
-        let builings_desc = event.rooms.buildings.length ? `🏢 ${event.rooms.buildings.join(" / ")}\\n` : undefined;
-        let rooms_desc = event.rooms.rooms.length ? `🏷️ ${event.rooms.rooms.join(" / ")}\\n` : undefined;
-        let roomTypes_desc = event.rooms.roomTypes.length ? `🛋️ ${event.rooms.roomTypes.join(" / ")}\\n` : undefined;
-        let roomCapacities_desc = event.rooms.roomCapacities.length ? `👥 ${event.rooms.roomCapacities.map(roomCapacity => `${roomCapacity} ${roomCapacity > 1 ? "personnes" : "personne"}`).join(" / ")}\\n` : undefined;
-        let professors_desc = event.professors.length ? `👩🏻‍🏫 ${event.professors.join(" / ")}\\n` : undefined;
-        let notes_desc = event.notes ? `✏️ ${event.notes}\\n` : undefined
+        let builings_desc = event.rooms.buildings.length ? `🏢 ${event.rooms.buildings.join(" / ")}` : undefined;
+        let rooms_desc = event.rooms.rooms.length ? `\\n🏷️ ${event.rooms.rooms.join(" / ")}` : undefined;
+        let roomTypes_desc = event.rooms.roomTypes.length ? `\\n🛋️ ${event.rooms.roomTypes.join(" / ")}` : undefined;
+        let roomCapacities_desc = event.rooms.roomCapacities.length ? `\\n👥 ${event.rooms.roomCapacities.map(roomCapacity => `${roomCapacity} ${roomCapacity > 1 ? "personnes" : "personne"}`).join(" / ")}` : undefined;
+        let professors_desc = event.professors.length ? `\\n👩🏻‍🏫 ${event.professors.join(" / ")}` : undefined;
+        let notes_desc = event.notes ? `\\n✏️ ${event.notes}` : undefined
         
         let icsEvent = begin_VEvent;
         icsEvent += `UID:${event.id || Math.random().toString(36).substr(2, 9)}\n`;
@@ -57,13 +67,13 @@ function generateICSCalendars(calendar) {
     icsCalendar_exams += end_VCalendar;
     icsCalendar_others += end_VCalendar;
 
-    fs.writeFileSync(`${settings.ics_path}.ics`, icsCalendar, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_cm.ics`, icsCalendar_cm, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_td.ics`, icsCalendar_td, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_tp.ics`, icsCalendar_tp, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_cc.ics`, icsCalendar_cc, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_exams.ics`, icsCalendar_exams, "utf8");
-    fs.writeFileSync(`${settings.ics_path}_others.ics`, icsCalendar_others, "utf8");
+    write_ics(`${settings.ics_path}.ics`, icsCalendar);
+    write_ics(`${settings.ics_path}_cm.ics`, icsCalendar_cm);
+    write_ics(`${settings.ics_path}_td.ics`, icsCalendar_td);
+    write_ics(`${settings.ics_path}_tp.ics`, icsCalendar_tp);
+    write_ics(`${settings.ics_path}_cc.ics`, icsCalendar_cc);
+    write_ics(`${settings.ics_path}_exams.ics`, icsCalendar_exams);
+    write_ics(`${settings.ics_path}_others.ics`, icsCalendar_others);
 
     console.log("file saved.");
 }
