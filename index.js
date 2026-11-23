@@ -31,6 +31,31 @@ if (MAIL_SCHEDULE && !MAIL_ENABLED) {
     log.warn('MAIL_SCHEDULE is set but the mail relay is not configured (MAIL_ADDRESS / MAIL_NOTIFY_TO missing) — ignored');
 }
 
+// Active window (local hours, Europe/Paris): when set (e.g. "8-20"), ticks
+// only run inside it — nothing is scraped or polled overnight, and anything
+// received overnight transfers at the first tick of the window. Supports a
+// window wrapping midnight ("22-6").
+const active_window = (() => {
+    const match = String(process.env.ACTIVE_WINDOW || "").match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+    if (!match) return null;
+    const from = Number(match[1]);
+    const to = Number(match[2]);
+    if (from === to || from > 23 || to > 24) return null;
+    return { from: from, to: to };
+})();
+if (process.env.ACTIVE_WINDOW && !active_window) {
+    log.warn(`invalid ACTIVE_WINDOW: "${process.env.ACTIVE_WINDOW}" (expected "from-to", e.g. "8-20") — ticks run 24/7`);
+}
+log.info(active_window ? `active window: ${active_window.from}h-${active_window.to}h` : 'active window: 24/7');
+
+function is_active_now() {
+    if (!active_window) return true;
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Europe/Paris' }).format(new Date()));
+    return active_window.from < active_window.to
+        ? hour >= active_window.from && hour < active_window.to
+        : hour >= active_window.from || hour < active_window.to;
+}
+
 let runCount = 0;
 
 // A tick slower than its interval is dropped, never queued (polling logic).
@@ -79,7 +104,9 @@ if (process.argv.includes('--test-mail')) {
             process.exit(1);
         }
 
-        const run = () => main().catch(error => log.error(`run #${runCount} fatal: ${error.message}`));
+        const run = () => is_active_now()
+            ? main().catch(error => log.error(`run #${runCount} fatal: ${error.message}`))
+            : log.debug('outside the active window — timetable tick skipped');
         run();
         cron.schedule(CELCAT_SCHEDULE, run);
     }
@@ -90,8 +117,11 @@ if (process.argv.includes('--test-mail')) {
             process.exit(1);
         }
 
-        mail_tick();
-        cron.schedule(MAIL_SCHEDULE, mail_tick);
+        const mail_run = () => is_active_now()
+            ? mail_tick()
+            : log.debug('outside the active window — mailbox tick skipped');
+        mail_run();
+        cron.schedule(MAIL_SCHEDULE, mail_run);
     }
 } else {
     main().catch(error => {

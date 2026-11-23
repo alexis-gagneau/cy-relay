@@ -107,8 +107,8 @@ const sites_location = {
 
 // MARK: - ICS
 
-// L'année universitaire va du 1er septembre au 30 juin de l'année suivante :
-// en septembre 2026 on passe sur "2026/2027", en juillet 2027 on y est encore.
+// The academic year runs from September 1 to June 30: from September 2026 on,
+// the feeds switch to "2026/2027" (and July 2027 still belongs to it).
 function academic_year(now = new Date()) {
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1 = janvier
