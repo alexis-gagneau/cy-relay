@@ -68,8 +68,16 @@ ICS feeds are written to the path configured in `configs/settings.json` (`ics_pa
 
 ```bash
 docker build -t cy-relay .
-docker run --env-file .env -v "$(pwd)/output:/app/output" cy-relay
+docker run --env-file .env \
+  -v "$(pwd)/output:/app/output" \
+  -v "$(pwd)/logs:/app/logs" \
+  cy-relay
 ```
+
+### Logs
+
+Logs go to **both** stdout (so `docker logs cy-relay` works) and `logs/celcat.log`.
+The log file is rotated at startup once it exceeds 5 MB (archived as `celcat.log.<date>.old`).
 
 ## Security
 

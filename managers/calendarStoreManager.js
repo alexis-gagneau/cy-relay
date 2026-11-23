@@ -2,8 +2,12 @@ const settings = require('./../configs/settings.json');
 const { event_type, begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar } = require('./../configs/constants');
 
 const fs = require("fs");
+const path = require("path");
 
 function generateICSCalendars(calendar) {
+    // Make sure the output directory exists (fresh container, first run...).
+    fs.mkdirSync(path.dirname(settings.ics_path), { recursive: true });
+
     let icsCalendar = begin_VCalendar;
     let icsCalendar_cm = begin_VCalendar_cm;
     let icsCalendar_td = begin_VCalendar_td;

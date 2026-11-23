@@ -7,15 +7,30 @@ const moment = require('moment');
 
 // MARK: - Requests manager
 
-async function do_request(url, method = "GET", headers = {}, body = null) {
-    let response = await fetch((body && method === "GET") ? url + body : url, {
-        headers: Object.assign(default_headers, headers),
-        method: method,
-        redirect: "manual",
-        body: method === "POST" ? body : null
-    });
+const REQUEST_TIMEOUT = 30000; // ms before giving up on a request
+const MAX_ATTEMPTS = 3;
 
-    return response;
+async function do_request(url, method = "GET", headers = {}, body = null) {
+    let lastError;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+            return await fetch((body && method === "GET") ? url + body : url, {
+                headers: Object.assign(default_headers, headers),
+                method: method,
+                redirect: "manual",
+                body: method === "POST" ? body : null,
+                signal: AbortSignal.timeout(REQUEST_TIMEOUT)
+            });
+        } catch (error) {
+            lastError = error;
+            if (attempt < MAX_ATTEMPTS) {
+                let wait = attempt * 2000;
+                console.log(`Network error (${error.message}) — retry ${attempt + 1}/${MAX_ATTEMPTS} in ${wait / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, wait));
+            }
+        }
+    }
+    throw lastError;
 }
 async function data_request(dataURL) {
     let session_cookie = await set_sc();

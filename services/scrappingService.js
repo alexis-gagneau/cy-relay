@@ -8,7 +8,14 @@ async function event_scrapper() {
     let calendar = [];
 
     for (let celcatEvent of celcatEvents) {
-        let sidebar_elements = await fetch_sidebar_data(celcatEvent.id);
+        let sidebar_elements;
+        try {
+            sidebar_elements = await fetch_sidebar_data(celcatEvent.id);
+        } catch (error) {
+            // One flaky sidebar request should not kill the whole run.
+            console.error(`Sidebar KO for event ${celcatEvent.id} — event skipped (${error.message})`);
+            continue;
+        }
         let shaped_event = event_shapper(celcatEvent, sidebar_elements);
         calendar.push(shaped_event);
     };

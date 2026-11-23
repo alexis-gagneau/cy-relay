@@ -6,9 +6,15 @@ const { generateICSCalendars } = require('./managers/calendarStoreManager');
 
 const logDirectory = './logs';
 const logFile = path.join(logDirectory, 'celcat.log');
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB before rotating
 
 if (!fs.existsSync(logDirectory)) {
     fs.mkdirSync(logDirectory, { recursive: true });
+}
+
+// Simple rotation: archive the current log when it grows too big.
+if (fs.existsSync(logFile) && fs.statSync(logFile).size > MAX_LOG_SIZE) {
+    fs.renameSync(logFile, `${logFile}.${new Date().toISOString().replace(/[:.]/g, '-')}.old`);
 }
 
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
@@ -18,17 +24,31 @@ function formatLog(message) {
     return `[${now}] ${message}\n`;
 }
 
-const originalLog = console.log;
-console.log = function(d) {
-    logStream.write(formatLog(d));
-    // originalLog.apply(console, arguments);
+// Join every argument (Errors print their message/stack), so nothing is lost.
+function logText(args) {
+    return Array.from(args)
+        .map(arg => arg instanceof Error ? (arg.stack || arg.message) : String(arg))
+        .join(' ');
+}
+
+// Logs go to the file AND to stdout/stderr, so `docker logs` shows them too.
+console.log = function() {
+    const line = formatLog(logText(arguments));
+    logStream.write(line);
+    process.stdout.write(line);
 };
 
-const originalError = console.error;
-console.error = function(d) {
-    logStream.write(formatLog(`ERROR: ${d}`));
-    // originalError.apply(console, arguments);
+console.error = function() {
+    const line = formatLog(`ERROR: ${logText(arguments)}`);
+    logStream.write(line);
+    process.stderr.write(line);
 };
+
+// Never die silently: log the failure, then exit non-zero.
+process.on('unhandledRejection', reason => {
+    console.error(`Unhandled rejection: ${reason instanceof Error ? reason.message : reason}`);
+    process.exitCode = 1;
+});
 
 async function main() {
     console.log('Starting Celcat scraping...');
@@ -38,4 +58,7 @@ async function main() {
     console.log('######################');
 }
 
-main();
+main().catch(error => {
+    console.error('Fatal:', error.message);
+    process.exit(1);
+});
