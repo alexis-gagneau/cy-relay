@@ -1,0 +1,18 @@
+# CY Relay — one-shot runner.
+#
+#   docker compose build                # build the image
+#   docker compose run --rm relay       # run one full scrape, logs streamed live
+#   docker compose up relay             # same, but keeps the container around
+#
+# The app is a one-shot job: it scrapes, writes the ICS feeds, then exits.
+# Schedule it from outside (cron, systemd timer...) or run it manually.
+# Secrets come from .env (never committed); feeds and logs are written to
+# the mounted ./output and ./logs folders.
+services:
+  relay:
+    build: .
+    image: cy-relay:latest
+    env_file: .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
