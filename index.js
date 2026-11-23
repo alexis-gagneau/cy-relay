@@ -58,7 +58,27 @@ async function main() {
     console.log('######################');
 }
 
-main().catch(error => {
-    console.error('Fatal:', error.message);
-    process.exit(1);
-});
+// --- Scheduling -------------------------------------------------------------
+// Set SCHEDULE in .env (cron syntax, e.g. "*/10 * * * *") to keep the process
+// alive and re-scrape automatically (Europe/Paris). Without it, the app runs
+// once and exits — perfect for an external cron job.
+const SCHEDULE = process.env.SCHEDULE;
+
+if (SCHEDULE) {
+    const cron = require('node-cron');
+
+    if (!cron.validate(SCHEDULE)) {
+        console.error(`Invalid SCHEDULE: "${SCHEDULE}"`);
+        process.exit(1);
+    }
+
+    console.log(`Schedule: "${SCHEDULE}" (Europe/Paris) — running now, then on schedule.`);
+    const run = () => main().catch(error => console.error('Fatal:', error.message));
+    run();
+    cron.schedule(SCHEDULE, run);
+} else {
+    main().catch(error => {
+        console.error('Fatal:', error.message);
+        process.exit(1);
+    });
+}

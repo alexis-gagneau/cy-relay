@@ -76,6 +76,17 @@ docker run --env-file .env \
   cy-relay
 ```
 
+### Scheduling
+
+Two ways to run it periodically:
+
+- **Inside the container** (recommended): set `SCHEDULE` (cron syntax, e.g.
+  `*/10 * * * *`) in `.env` or with `-e SCHEDULE="*/10 * * * *"`. The container
+  stays up and re-scrapes on schedule (Europe/Paris) — a plain
+  `docker compose up -d` replaces the external cron job.
+- **Outside**: leave `SCHEDULE` unset and let a cron job / systemd timer run
+  the container every 10 minutes — one run per invocation, then it exits.
+
 ### Logs
 
 Logs go to **both** stdout (so `docker logs cy-relay` works) and `logs/celcat.log`.
