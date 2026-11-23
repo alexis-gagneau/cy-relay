@@ -9,6 +9,10 @@ const event_type = {
         name: "Travaux Dirigés",
         abreviation: "TD"
     },
+    tp: {
+        name: "Travaux Pratiques",
+        abreviation: "TP"
+    },
     cc: {
         name: "Contrôles Continues",
         abreviation: "CC"
@@ -103,12 +107,24 @@ const sites_location = {
 
 // MARK: - ICS
 
-const begin_VCalendar = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - EDT 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA\nX-APPLE-CALENDAR-COLOR:#2760ab\n";
-const begin_VCalendar_cm = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Cours Magistraux 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Cours Magistraux - 2025/2026 - Groupe 3\nX-APPLE-CALENDAR-COLOR:#D5E1DE\n";
-const begin_VCalendar_td = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Travaux Dirigés 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Travaux Dirigés - 2025/2026 - Groupe 3\nX-APPLE-CALENDAR-COLOR:#D1DCEB\n";
-const begin_VCalendar_cc = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Contrôles Continues 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Contrôles Continues - 2025/2026 - Groupe 3\nX-APPLE-CALENDAR-COLOR:#D9C5F8\n";
-const begin_VCalendar_exams = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Partiels 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Partiels - 2025/2026 - Groupe 3\nX-APPLE-CALENDAR-COLOR:#D4CDE7\n";
-const begin_VCalendar_others = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Autres évènements 2026/2027\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Autres évènements - 2025/2026 - Groupe 3\nX-APPLE-CALENDAR-COLOR:#D9CCD9\n";
+// L'année universitaire va du 1er septembre au 30 juin de l'année suivante :
+// en septembre 2026 on passe sur "2026/2027", en juillet 2027 on y est encore.
+function academic_year(now = new Date()) {
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1 = janvier
+    return month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+const YEAR = academic_year();
+const GROUP = "Groupe 1";
+
+const begin_VCalendar = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - EDT ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA\nX-APPLE-CALENDAR-COLOR:#2760ab\n`;
+const begin_VCalendar_cm = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Cours Magistraux ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Cours Magistraux - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#D5E1DE\n`;
+const begin_VCalendar_td = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Travaux Dirigés ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Travaux Dirigés - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#D1DCEB\n`;
+const begin_VCalendar_tp = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Travaux Pratiques ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Travaux Pratiques - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#CDE8D8\n`;
+const begin_VCalendar_cc = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Contrôles Continues ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Contrôles Continues - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#D9C5F8\n`;
+const begin_VCalendar_exams = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Partiels ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Partiels - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#D4CDE7\n`;
+const begin_VCalendar_others = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:PRODID:-//CY Cal Software//NONSGML v1.0//FR\nX-WR-CALNAME:CY Tech - Autres évènements ${YEAR}\nX-WR-CALDESC:CY Tech - EDT Ing 1 GIA - Autres évènements - ${YEAR} - ${GROUP}\nX-APPLE-CALENDAR-COLOR:#D9CCD9\n`;
 const begin_VEvent = `BEGIN:VEVENT\n`;
 const end_VEvent = `END:VEVENT\n`;
 const end_VCalendar = "END:VCALENDAR";
@@ -124,6 +140,6 @@ const default_headers = {
 
 module.exports = {
     event_type, site_buildings, sites_location,
-    begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar,
+    begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_tp, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar,
     default_headers
 };

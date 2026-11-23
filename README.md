@@ -15,7 +15,7 @@ Unofficial personal relay for **CY Cergy Paris Université** (CYU) student servi
   credentials (anti-forgery token + session cookies).
 - Shapes raw events: titles, rooms, buildings, capacities, professors, sites
   (with Apple structured locations).
-- Generates **six ICS feeds** — full calendar, CM, TD, CC, exams, other — ready to
+- Generates **seven ICS feeds** — full calendar, CM, TD, TP, CC, exams, other — ready to
   subscribe to from Apple Calendar, Google Calendar, or anything that speaks ICS.
 
 ### 🚧 Mailbox relay (planned)
@@ -87,7 +87,7 @@ The log file is rotated at startup once it exceeds 5 MB (archived as `celcat.log
 
 ## Roadmap
 
-- [x] CELCAT → six ICS feeds
+- [x] CELCAT → seven ICS feeds (one per event category, dynamic academic year)
 - [ ] Mailbox relay: CYU SSO → inbox polling → notifications with `Reply-To`
 - [ ] Resilient scheduling (exponential backoff, night pause)
 - [ ] Full English codebase and comments

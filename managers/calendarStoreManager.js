@@ -1,5 +1,5 @@
 const settings = require('./../configs/settings.json');
-const { event_type, begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar } = require('./../configs/constants');
+const { event_type, begin_VCalendar, begin_VCalendar_cm, begin_VCalendar_td, begin_VCalendar_tp, begin_VCalendar_cc, begin_VCalendar_exams, begin_VCalendar_others, begin_VEvent, end_VEvent, end_VCalendar } = require('./../configs/constants');
 
 const fs = require("fs");
 const path = require("path");
@@ -11,6 +11,7 @@ function generateICSCalendars(calendar) {
     let icsCalendar = begin_VCalendar;
     let icsCalendar_cm = begin_VCalendar_cm;
     let icsCalendar_td = begin_VCalendar_td;
+    let icsCalendar_tp = begin_VCalendar_tp;
     let icsCalendar_cc = begin_VCalendar_cc;
     let icsCalendar_exams = begin_VCalendar_exams;
     let icsCalendar_others = begin_VCalendar_others;
@@ -38,6 +39,8 @@ function generateICSCalendars(calendar) {
             icsCalendar_cm += icsEvent;
         } else if (event.type == event_type.td) {
             icsCalendar_td += icsEvent;
+        } else if (event.type == event_type.tp) {
+            icsCalendar_tp += icsEvent;
         } else if (event.type == event_type.cc) {
             icsCalendar_cc += icsEvent;
         } else if (event.type == event_type.exam) {
@@ -49,6 +52,7 @@ function generateICSCalendars(calendar) {
     icsCalendar += end_VCalendar;
     icsCalendar_cm += end_VCalendar;
     icsCalendar_td += end_VCalendar;
+    icsCalendar_tp += end_VCalendar;
     icsCalendar_cc += end_VCalendar;
     icsCalendar_exams += end_VCalendar;
     icsCalendar_others += end_VCalendar;
@@ -56,6 +60,7 @@ function generateICSCalendars(calendar) {
     fs.writeFileSync(`${settings.ics_path}.ics`, icsCalendar, "utf8");
     fs.writeFileSync(`${settings.ics_path}_cm.ics`, icsCalendar_cm, "utf8");
     fs.writeFileSync(`${settings.ics_path}_td.ics`, icsCalendar_td, "utf8");
+    fs.writeFileSync(`${settings.ics_path}_tp.ics`, icsCalendar_tp, "utf8");
     fs.writeFileSync(`${settings.ics_path}_cc.ics`, icsCalendar_cc, "utf8");
     fs.writeFileSync(`${settings.ics_path}_exams.ics`, icsCalendar_exams, "utf8");
     fs.writeFileSync(`${settings.ics_path}_others.ics`, icsCalendar_others, "utf8");

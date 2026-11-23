@@ -24,6 +24,10 @@ function event_shapper(celcatEvent, sidebar_elements) {
                     category = sidebar_element.content;
                     type = event_type.td;
                     break;
+                case "TP":
+                    category = sidebar_element.content;
+                    type = event_type.tp;
+                    break;
                 case "Contrôle continu":
                     category = "CC";
                     type = event_type.cc;
