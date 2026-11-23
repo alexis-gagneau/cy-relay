@@ -1,0 +1,9 @@
+# Files that should never end up in a Docker build context or image
+node_modules/
+logs/
+output/
+.git/
+.gitignore
+.DS_Store
+*.log
+README.md

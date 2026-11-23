@@ -1,0 +1,16 @@
+{
+    "id": "YOUR_STUDENT_ID",
+    "username": "e-yourcyulogin",
+    "password": "YOUR_CYU_PASSWORD",
+
+    "antiforgeryStuff_url": "https://celcat-calendar.cyu.fr/LdapLogin",
+    "signIn_url": "https://celcat-calendar.cyu.fr/LdapLogin/Logon",
+    "calendar_url": "https://celcat-calendar.cyu.fr/",
+    "calendarData_url": "https://celcat-calendar.cyu.fr/Home/GetCalendarData",
+    "sidebarData_url": "https://celcat-calendar.cyu.fr/Home/GetSideBarEvent",
+
+    "login_id": "#Name",
+    "passw_id": "#Password",
+
+    "ics_path": "/app/output/timetable"
+}

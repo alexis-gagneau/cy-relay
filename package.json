@@ -1,0 +1,16 @@
+{
+    "name": "cy_cal",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "html-entities": "^2.1.1",
+        "ics": "^2.27.0",
+        "moment": "^2.29.1",
+        "node-cron": "^3.0.3",
+        "node-fetch": "^2.6.1"
+    }
+}

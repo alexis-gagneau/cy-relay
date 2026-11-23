@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Runtime artifacts
+logs/
+output/
+*.log
+
+# Secrets — never commit real credentials
+configs/settings.json
+.env
+.env.*
+!.env.example
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
