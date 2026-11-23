@@ -1,4 +1,4 @@
-# 🌀 CY Relay
+# 📡 CY Relay
 
 Unofficial personal relay for **CY Cergy Paris Université** (CYU) student services —
 *your CYU campus, relayed*: the CELCAT timetable and your student mailbox, in the
@@ -128,4 +128,4 @@ after repeated failures).
 
 ---
 
-**License** — [MIT](LICENSE) · <sub>*Built partly with AI assistance*</sub>
+**License** — [MIT](LICENSE) · *Built partly with AI assistance*
