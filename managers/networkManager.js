@@ -17,6 +17,9 @@ async function do_request(url, method = "GET", headers = {}, body = null) {
     let lastError;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
+            // Merge INTO the shared headers on purpose: the sidebar requests
+            // made after data_request rely on the cookie/content-type set
+            // here (see set_sc, which clears the leftovers of previous runs).
             return await fetch((body && method === "GET") ? url + body : url, {
                 headers: Object.assign(default_headers, headers),
                 method: method,
@@ -40,7 +43,7 @@ async function data_request(dataURL) {
     
     let response = await do_request(dataURL,
         "POST",
-        { cookie: session_cookie },
+        { cookie: session_cookie, "content-type": "application/x-www-form-urlencoded" },
         `start=${moment().subtract(1, "month").format("YYYY-MM-DD")}&end=${moment().add(1, "year").format("YYYY")}-12-31&resType=104&calView=month&federationIds%5B%5D=${credentials.id}`
     );
 
@@ -81,6 +84,14 @@ function get_ac(response) {
     return cookie.split(";")[0];
 }
 async function set_sc() {
+    // do_request merges its headers into the shared default_headers: a cookie
+    // left there by a previous run of the same process (SCHEDULED mode) makes
+    // CELCAT see an existing session and skip the fresh Set-Cookie — which
+    // killed every tick after the first one. Each login starts clean; the
+    // login POST below re-seeds the shared headers for the sidebar requests.
+    delete default_headers.cookie;
+    delete default_headers["content-type"];
+
     log.info(`reaching ${new URL(settings.calendar_url).host}`);
     let antiforgery_stuff = await get_antiforgerystuff();
     
