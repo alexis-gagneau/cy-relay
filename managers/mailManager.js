@@ -4,9 +4,11 @@
 // and refuses password auth on IMAP/SMTP: only the web SSO works. This
 // manager replays the browser SSO flow (Shibboleth IdP -> CAS -> SAML) to
 // obtain a session, then polls the inbox through the Zimbra REST API and
-// TRANSFERS every new unread message to a personal address, as-is: original
-// subject, full body and attachments (no .eml wrapper), with Reply-To set
-// to the original sender(s).
+// TRANSFERS every new unread message to a personal address, so it reads
+// like a mail landing directly there: original subject, untouched body,
+// From displaying the real sender's name, attachments re-attached (no
+// .eml wrapper), Reply-To set to the original sender(s), and a single
+// discreet "Transféré par CY Relay" line at the very bottom.
 //
 // Runtime state lives in runtime/ (git-ignored): session cookies, seen
 // message ids, and an auth-lock marker used to protect the CYU account
@@ -422,22 +424,31 @@ async function forward_message(jar, token, full) {
     const senders = full.participants.filter(p => p.t === "f");
     if (!senders.length && full.participants.length) senders.push(full.participants[0]);
     const is_html = /html/i.test(full.body_type);
-    const newline = is_html ? "<br>" : "\n";
 
-    const transfer_header = [
-        "---------- Message transféré ----------",
-        `De : ${senders.map(p => `${p.p || p.d || p.a || "?"} <${p.a}>`).join(", ")}`,
-        `Date : ${/^\d+$/.test(String(full.date)) ? new Date(Number(full.date)).toLocaleString("fr-FR", { timeZone: "Europe/Paris" }) : "unknown date"}`,
-        `Objet : ${full.subject || "(no subject)"}`,
-        ""
-    ].join(newline);
+    const sender_names = senders.map(p => p.p || p.d || p.a || "?").join(", ") || "?";
+    const sender_line = senders.map(p => {
+        const name = p.p || p.d || p.a || "?";
+        return p.a ? `${name} <${p.a}>` : name;
+    }).join(", ");
+    const when = /^\d+$/.test(String(full.date))
+        ? new Date(Number(full.date)).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })
+        : "date inconnue";
+
+    // The transfer should read like a mail landing directly in the personal
+    // box: the original body goes untouched, the From shows the real
+    // sender's name, and the relay leaves a single discreet line at the
+    // very bottom for traceability.
+    const footer = `Transféré par CY Relay · expéditeur d'origine : ${sender_line} · reçu le ${when}`;
+    const content = is_html
+        ? `${full.body}<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e8e8e8;color:#9a9a9a;font-size:12px;">${footer}</div>`
+        : `${full.body}\n\n-- \n${footer}`;
 
     const request = '<SendMsgRequest xmlns="urn:zimbraMail"><m>' +
         `<e t="t" a="${encode(credentials.mail_notify_to, { mode: "specialChars" })}"/>` +
-        `<e t="f" a="${encode(credentials.mail_address, { mode: "specialChars" })}"/>` +
+        `<e t="f" p="${encode(sender_names, { mode: "specialChars" })}" a="${encode(credentials.mail_address, { mode: "specialChars" })}"/>` +
         senders.filter(p => p.a).map(p => `<e t="r" a="${encode(p.a, { mode: "specialChars" })}"/>`).join("") +
         `<su>${encode(full.subject || "(no subject)", { mode: "specialChars" })}</su>` +
-        `<mp ct="${is_html ? "text/html" : "text/plain"}"><content>${encode(transfer_header + newline + full.body, { mode: "specialChars" })}</content></mp>` +
+        `<mp ct="${is_html ? "text/html" : "text/plain"}"><content>${encode(content, { mode: "specialChars" })}</content></mp>` +
         (full.attachments.length
             ? "<attach>" + full.attachments.map(a => `<mp mid="${full.id}" part="${a.part}"/>`).join("") + "</attach>"
             : "") +
