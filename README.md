@@ -126,6 +126,6 @@ against CYU services — nothing is stored, logged or sent anywhere else. A refu
 login locks the mailbox SSO instead of retrying (the CYU directory blocks accounts
 after repeated failures).
 
-## License
+---
 
-[MIT](LICENSE) · built with AI assistance
+**License** — [MIT](LICENSE) · <sub>*Built partly with AI assistance*</sub>
