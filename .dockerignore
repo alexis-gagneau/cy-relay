@@ -1,9 +1,10 @@
-# Files that should never end up in a Docker build context or image
+# Keep credentials and runtime artifacts out of Docker build contexts
 node_modules/
 logs/
 output/
 .git/
-.gitignore
 .DS_Store
 *.log
-README.md
+.env
+.env.*
+!.env.example

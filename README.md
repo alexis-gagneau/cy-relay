@@ -1,87 +1,89 @@
-# CY Campus Relay
+# CY Relay
 
-Unofficial, personal tooling for **CY Cergy Paris Université** student services.
-The project relays what the university does not expose through standard, student-friendly
-channels — today the CELCAT timetable, and soon the student mailbox.
+Unofficial personal relay for **CY Cergy Paris Université** (CYU) student services —
+*your CYU campus, relayed*: the CELCAT timetable today, your student mailbox next.
 
-> ⚠️ **Disclaimer** — This project is **not** affiliated with, endorsed by, or connected to
-> CY Cergy Paris Université or RENATER. It automates access to student-facing services with
-> the owner's own student credentials, for personal use only. Use responsibly and respect
-> your institution's IT rules.
+> ⚠️ **Disclaimer** — This project is not affiliated with, endorsed by, or connected to
+> CY Cergy Paris Université or RENATER. It uses the owner's own student credentials,
+> for personal use only. Use responsibly and respect your institution's IT policies.
 
-## Features
+## What it does
 
-### ✅ Timetable → subscribable calendar feeds (current)
-- Logs into the **CELCAT** timetable web app (`celcat-calendar.cyu.fr`) with your own CYU
+### ✅ Timetable → subscribable ICS feeds (current)
+
+- Scrapes the CYU **CELCAT** timetable (`celcat-calendar.cyu.fr`) with your own
   credentials (anti-forgery token + session cookies).
-- Pulls the calendar data (rolling window: last month → end of next year) plus the
-  per-event sidebar (category, module, professors, rooms).
-- Shapes raw events: normalized titles, room/building/capacity parsing, CYU & CY Tech
-  site geolocation (Apple structured locations included).
-- Generates **six ICS feeds** — full calendar, CM, TD, continuous assessment (CC),
-  exams, and other events — ready to subscribe to from Apple Calendar, Google Calendar, etc.
+- Shapes raw events: titles, rooms, buildings, capacities, professors, sites
+  (with Apple structured locations).
+- Generates **six ICS feeds** — full calendar, CM, TD, CC, exams, other — ready to
+  subscribe to from Apple Calendar, Google Calendar, or anything that speaks ICS.
 
 ### 🚧 Mailbox relay (planned)
-The university blocks both native mail forwarding
-(`service.PERM_DENIED: forwarding not enabled`) and direct IMAP/SMTP password access on
-student mailboxes, so the relay will do it the app way:
-- sign in through the CYU SSO (Shibboleth IdP → CAS → SAML), like a browser;
+
+The university disables mail forwarding and direct IMAP/SMTP access on student
+mailboxes (`service.PERM_DENIED: forwarding not enabled`), so the relay will:
+
+- sign in through the **CYU SSO** (Shibboleth IdP → CAS → SAML), like a browser;
 - poll the inbox through the Zimbra (RENATER Partage) REST API;
 - push a notification card to a personal address for every new unread message,
-  with `Reply-To` set to the original sender(s) so replies go to the right person.
+  with `Reply-To` set to the original sender(s).
 
 ## Project layout
 
 ```
 index.js                          entry point + file logging
-services/scrappingService.js      CELCAT scraping (calendar + per-event sidebar data)
-managers/networkManager.js        HTTP requests + CELCAT session (anti-forgery token, cookies)
-managers/eventShapeManager.js     event shaping (titles, rooms, sites, professors, English classes)
+services/scrappingService.js      CELCAT scraping (calendar + per-event sidebar)
+managers/networkManager.js        HTTP + CELCAT session (anti-forgery token, cookies)
+managers/eventShapeManager.js     event shaping (titles, rooms, sites, professors)
 managers/calendarStoreManager.js  ICS generation (one feed per event category)
-utils/dateUtils.js                date parsing helpers
 configs/constants.js              event types, campus sites, ICS templates
-configs/settings.json             credentials & endpoints — NOT committed (see .gitignore)
+configs/env.js                    .env loader + credentials access
+configs/settings.json             non-secret settings (endpoints, selectors, paths)
+utils/dateUtils.js                date helpers
+```
+
+## Configuration
+
+Two files, two purposes:
+
+| File | Committed? | Contents |
+|---|---|---|
+| `.env` | ❌ never | Secrets: `CYU_ID`, `CYU_USERNAME`, `CYU_PASSWORD` |
+| `configs/settings.json` | ✅ | Non-secret settings: CELCAT endpoints, DOM selectors, ICS output path |
+
+```bash
+cp .env.example .env    # then fill in your CYU credentials
 ```
 
 ## Getting started
 
-1. Create your local configuration:
+```bash
+npm install
+node index.js
+```
 
-   ```bash
-   cp configs/settings.example.json configs/settings.json
-   ```
-
-   then fill in your CYU student id, username (`e-…`) and password.
-
-2. Install and run:
-
-   ```bash
-   npm install
-   node index.js
-   ```
-
-   ICS feeds are written to the path configured in `ics_path` (one per event category).
+ICS feeds are written to the path configured in `configs/settings.json` (`ics_path`).
 
 ### Docker
 
 ```bash
-docker build -t cy-campus-relay .
-docker run -v "$(pwd)/configs:/app/configs" -v "$(pwd)/output:/app/output" cy-campus-relay
+docker build -t cy-relay .
+docker run --env-file .env -v "$(pwd)/output:/app/output" cy-relay
 ```
 
-## Security notes
+## Security
 
-- `configs/settings.json` holds real credentials: it is **git-ignored** and must never be
-  committed. Use `configs/settings.example.json` as the template.
-- Repeated failed logins can temporarily lock a CYU directory account — never retry
-  credentials in a loop. Any automation must stop after a single rejected attempt.
+- `.env` (real credentials) is **git-ignored** — never commit it.
+- Failed logins can temporarily lock a CYU directory account: never retry
+  credentials in a loop. Any automation must stop after a single rejection.
 
 ## Roadmap
 
-- [ ] Mailbox notifications via the CYU SSO (Shibboleth/CAS/SAML) → personal e-mail with `Reply-To`
-- [ ] Resilient scheduling: exponential backoff, night pause, credential-lockout guard
+- [x] CELCAT → six ICS feeds
+- [ ] Mailbox relay: CYU SSO → inbox polling → notifications with `Reply-To`
+- [ ] Resilient scheduling (exponential backoff, night pause)
 - [ ] Full English codebase and comments
 
 ## License
 
-[MIT](LICENSE) — personal project.
+[MIT](LICENSE)

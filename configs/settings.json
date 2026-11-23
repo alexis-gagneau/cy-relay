@@ -1,8 +1,4 @@
 {
-    "id": "YOUR_STUDENT_ID",
-    "username": "e-yourcyulogin",
-    "password": "YOUR_CYU_PASSWORD",
-
     "antiforgeryStuff_url": "https://celcat-calendar.cyu.fr/LdapLogin",
     "signIn_url": "https://celcat-calendar.cyu.fr/LdapLogin/Logon",
     "calendar_url": "https://celcat-calendar.cyu.fr/",

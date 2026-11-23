@@ -1,5 +1,6 @@
 const settings = require('./../configs/settings.json');
 const { default_headers } = require('./../configs/constants');
+const credentials = require('./../configs/env');
 
 const fetch = require('node-fetch');
 const moment = require('moment');
@@ -22,7 +23,7 @@ async function data_request(dataURL) {
     let response = await do_request(dataURL,
         "POST",
         { cookie: session_cookie },
-        `start=${moment().subtract(1, "month").format("YYYY-MM-DD")}&end=${moment().add(1, "year").format("YYYY")}-12-31&resType=104&calView=month&federationIds%5B%5D=${settings.id}`
+        `start=${moment().subtract(1, "month").format("YYYY-MM-DD")}&end=${moment().add(1, "year").format("YYYY")}-12-31&resType=104&calView=month&federationIds%5B%5D=${credentials.id}`
     );
 
     return await response.json();
@@ -57,7 +58,7 @@ async function set_sc() {
             cookie: antiforgery_stuff[0],
             "content-type": "application/x-www-form-urlencoded"
         },
-        `Name=${encodeURIComponent(settings.username)}&Password=${encodeURIComponent(settings.password)}&__RequestVerificationToken=${encodeURIComponent(antiforgery_stuff[1])}`
+        `Name=${encodeURIComponent(credentials.username)}&Password=${encodeURIComponent(credentials.password)}&__RequestVerificationToken=${encodeURIComponent(antiforgery_stuff[1])}`
     );
 
     return `${antiforgery_stuff[0]};${get_ac(response)}`;
