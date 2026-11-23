@@ -1,7 +1,7 @@
 {
     "name": "cy-relay",
     "version": "1.0.0",
-    "description": "",
+    "description": "Personal relay for CYU student services — CELCAT timetable as ICS feeds + mailbox relay. Built by Alexis Gagneau with AI assistance (OpenCode).",
     "main": "index.js",
     "scripts": {
         "start": "node index.js"
