@@ -3,6 +3,7 @@ const path = require('path');
 
 const { event_scrapper } = require('./services//scrappingService');
 const { generateICSCalendars } = require('./managers/calendarStoreManager');
+const { check_mail, send_test_notification } = require('./managers/mailManager');
 
 const logDirectory = './logs';
 const logFile = path.join(logDirectory, 'celcat.log');
@@ -55,6 +56,14 @@ async function main() {
     let calendar = await event_scrapper();
     generateICSCalendars(calendar);
     console.log('Celcat scraping completed.');
+
+    // Mail relay: a mail failure must never kill the timetable run.
+    console.log('Checking the CYU mailbox...');
+    try {
+        await check_mail();
+    } catch (error) {
+        console.error(`Mail check failed: ${error.message}`);
+    }
     console.log('######################');
 }
 
@@ -64,7 +73,16 @@ async function main() {
 // once and exits — perfect for an external cron job.
 const SCHEDULE = process.env.SCHEDULE;
 
-if (SCHEDULE) {
+// `node index.js --test-mail` transfers a test message to MAIL_NOTIFY_TO.
+if (process.argv.includes('--test-mail')) {
+    send_test_notification().then(ok => {
+        console.log(ok ? 'Test message transferred.' : 'Test transfer FAILED.');
+        process.exit(ok ? 0 : 1);
+    }).catch(error => {
+        console.error('Fatal:', error.message);
+        process.exit(1);
+    });
+} else if (SCHEDULE) {
     const cron = require('node-cron');
 
     if (!cron.validate(SCHEDULE)) {

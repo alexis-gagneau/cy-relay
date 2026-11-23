@@ -4,6 +4,7 @@ node_modules/
 # Runtime artifacts
 logs/
 output/
+runtime/
 *.log
 
 # Secrets — never commit real credentials

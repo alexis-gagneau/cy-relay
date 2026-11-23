@@ -8,5 +8,9 @@
     "login_id": "#Name",
     "passw_id": "#Password",
 
-    "ics_path": "/app/output/timetable"
+    "ics_path": "/app/output/timetable",
+
+    "mail_url": "https://mail.etu.cyu.fr",
+    "mail_inbox_path": "/home/~/Inbox?fmt=json",
+    "mail_soap_path": "/service/soap"
 }

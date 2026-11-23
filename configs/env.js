@@ -52,5 +52,9 @@ function read(name, legacyKey) {
 module.exports = {
     get id() { return read('CYU_ID', 'id'); },
     get username() { return read('CYU_USERNAME', 'username'); },
-    get password() { return read('CYU_PASSWORD', 'password'); }
+    get password() { return read('CYU_PASSWORD', 'password'); },
+    // Mail relay (optional): the mail manager skips itself when these are
+    // missing, so they have no legacy fallback and never throw here.
+    get mail_address() { return process.env.MAIL_ADDRESS; },
+    get mail_notify_to() { return process.env.MAIL_NOTIFY_TO; }
 };
