@@ -1,0 +1,25 @@
+# CY Relay — default deployment template.
+#
+#   cp .env.example .env    # then fill in your CYU credentials
+#   docker compose up -d --build
+#
+# The container stays up and re-runs the timetable on SCHEDULE (Europe/Paris).
+# This SCHEDULE is a working out-of-the-box default: comment it out (or edit
+# it) to drive every schedule from .env instead.
+
+name: cy-relay
+
+services:
+  cy-relay:
+    build: .
+    container_name: cy-relay
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - SCHEDULE=*/10 * * * *  # out-of-the-box default — remove to drive it from .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./runtime:/app/runtime # session cookies + seen ids — survives rebuilds
+    security_opt:
+      - no-new-privileges:true

@@ -77,15 +77,17 @@ docker compose up -d --build
 docker logs -f cy-relay
 ```
 
-The committed `docker-compose.yml` keeps the container alive on the schedules below
-and mounts `output/` and `logs/` — subscribe your calendar app to the ICS feeds and
-you're done.
+The committed `compose.yaml` keeps the container alive on a 10-minute timetable
+cadence and mounts `output/`, `logs/` and `runtime/` (session cookies + seen ids
+survive rebuilds) — subscribe your calendar app to the ICS feeds and you're done.
 
 ## ⏱️ Schedules
 
 `SCHEDULE` is the default cadence; `CELCAT_SCHEDULE` and `MAIL_SCHEDULE` override it
-per service (compose defaults: timetable `*/10`, mailbox probe `*/3` — the probe is a
-single light GET with the session kept warm).
+per service. The compose file pins `SCHEDULE=*/10` as the out-of-the-box default —
+remove that line from the compose to drive the schedules from `.env` instead. The
+mailbox follows the timetable cadence unless you set `MAIL_SCHEDULE` (e.g. `*/3` —
+a probe is a single light GET with the session kept warm).
 
 `ACTIVE_WINDOW` (e.g. `8-20`, local hours) keeps the relay awake only between those
 hours: nothing is scraped or polled overnight, and anything received at night
