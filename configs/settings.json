@@ -12,5 +12,6 @@
 
     "mail_url": "https://mail.etu.cyu.fr",
     "mail_inbox_path": "/home/~/Inbox?fmt=json",
+    "mail_part_path": "/service/home/~/",
     "mail_soap_path": "/service/soap"
 }

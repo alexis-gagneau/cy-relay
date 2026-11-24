@@ -1,6 +1,6 @@
 const { event_scrapper } = require('./services//scrappingService');
 const { generateICSCalendars } = require('./managers/calendarStoreManager');
-const { check_mail, send_test_notification } = require('./managers/mailManager');
+const { check_mail, send_test_notification, replay_messages } = require('./managers/mailManager');
 const { create_logger } = require('./managers/logManager');
 
 const pkg = require('./package.json');
@@ -90,6 +90,19 @@ async function main() {
 if (process.argv.includes('--test-mail')) {
     send_test_notification().then(ok => {
         log[ok ? 'info' : 'error'](ok ? 'test transfer sent' : 'test transfer FAILED');
+        process.exit(ok ? 0 : 1);
+    }).catch(error => {
+        log.error(`fatal: ${error.message}`);
+        process.exit(1);
+    });
+} else if (process.argv.includes('--replay-mail')) {
+    // `node index.js --replay-mail [n]` re-transfers the n most recent
+    // messages already in the CYU inbox, exactly as if they had just
+    // arrived — the seen list is untouched, so nothing will be sent twice.
+    const index = process.argv.indexOf('--replay-mail');
+    const count = Number(process.argv[index + 1]) || 1;
+    replay_messages(count).then(ok => {
+        log[ok ? 'info' : 'error'](ok ? `replay of ${count} message(s) done` : 'replay FAILED');
         process.exit(ok ? 0 : 1);
     }).catch(error => {
         log.error(`fatal: ${error.message}`);

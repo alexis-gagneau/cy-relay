@@ -56,8 +56,9 @@ git-ignored: never commit it.
 
 ```bash
 npm install
-node index.js               # one run, then exits
-node index.js --test-mail   # transfers a test message to MAIL_NOTIFY_TO
+node index.js                 # one run, then exits
+node index.js --test-mail     # transfers a test message to MAIL_NOTIFY_TO
+node index.js --replay-mail 2 # re-transfers the 2 most recent messages already received
 ```
 
 Feeds are written to the `ics_path` from `configs/settings.json`.

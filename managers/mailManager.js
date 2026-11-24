@@ -29,6 +29,7 @@ const log = create_logger("mail");
 const MAIL_URL = settings.mail_url;
 const INBOX_URL = MAIL_URL + settings.mail_inbox_path;
 const SOAP_URL = MAIL_URL + settings.mail_soap_path;
+const PART_URL = MAIL_URL + settings.mail_part_path;
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_FORM_STEPS = 12;      // IdP hops (LS page, CAS, consent, SAML...)
@@ -393,22 +394,49 @@ async function fetch_full_message(jar, id) {
         });
     }
 
-    // Body: the part(s) flagged body="1" (text and/or html leaf of the mail).
-    let body_tag = (text.match(/<mp\b[^>]*body="1"[^>]*>/i) || [""])[0];
-    let body_type = body_tag ? attr_of(body_tag, "ct") : "";
-    if (/multipart/i.test(body_type)) {
-        const after_body = text.slice(text.indexOf(body_tag) + body_tag.length);
-        body_tag = (after_body.match(/<mp\b[^>]*ct="text\/[^"]*"[^>]*>/i) || [""])[0];
-        body_type = body_tag ? attr_of(body_tag, "ct") : "";
+    // MP tags can carry a Content-ID whose closing '>' Zimbra leaves
+    // unescaped — a naive [^>]* match stops there and hides every attribute
+    // after it (part= included). Attribute values are matched as a whole.
+    const mp_tags = text.match(/<mp\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi) || [];
+
+    // Body: prefer the text/html leaf — it is what carries the original
+    // formatting (multipart/alternative ships both a plain and an html
+    // version) — and fall back to the plain part. An attached .html file
+    // carries a filename, so it never masquerades as the body.
+    const find_body = (ct) => {
+        for (const tag of mp_tags) {
+            if (!tag.includes(`ct="${ct}"`)) continue;
+            if (/\bfilename=/.test(tag)) continue; // attached file, not the body
+            const content = text.slice(text.indexOf(tag) + tag.length).match(/<content>([\s\S]*?)<\/content>/i);
+            if (content) return { type: attr_of(tag, "ct"), body: xml_unescape(content[1]) };
+        }
+        return null;
+    };
+    let part = find_body("text/html");
+    if (!part) {
+        // Zimbra only inlines the content of the first alternative (the
+        // plain text): its html leaf comes back as a stub carrying its
+        // part number. The html content is then fetched through the REST
+        // part route (the same one the webmail uses for attachments) —
+        // the SOAP part= addressing proved unreliable for some messages.
+        const stub = mp_tags.find(t => t.includes('ct="text/html"') && !/\bfilename=/.test(t)) || "";
+        const part_number = attr_of(stub, "part");
+        if (part_number) {
+            const response = await request(jar, PART_URL + "?id=" + id + "&part=" + part_number, { method: "GET" }, 2);
+            const type = (response.headers.get("content-type") || "").toLowerCase();
+            if (response.status === 200 && type.startsWith("text/")) {
+                part = { type: /html/.test(type) ? "text/html" : "text/plain", body: await response.text() };
+            }
+        }
     }
-    if (body_tag) {
-        const content = text.slice(text.indexOf(body_tag) + body_tag.length).match(/<content>([\s\S]*?)<\/content>/i);
-        if (content) full.body = xml_unescape(content[1]);
+    if (!part) part = find_body("text/plain");
+    if (part) {
+        full.body = part.body;
+        full.body_type = part.type;
     }
-    full.body_type = body_type || "text/plain";
 
     // Attachments: any part carrying a filename (or an embedded message).
-    for (const tag of text.match(/<mp\b[^>]*>/gi) || []) {
+    for (const tag of mp_tags) {
         if (/body="1"/i.test(tag)) continue;
         const filename = attr_of(tag, "filename");
         const ct = attr_of(tag, "ct");
@@ -438,17 +466,43 @@ async function forward_message(jar, token, full) {
     // box: the original body goes untouched, the From shows the real
     // sender's name, and the relay leaves a single discreet line at the
     // very bottom for traceability.
-    const footer = `Transféré par CY Relay · expéditeur d'origine : ${sender_line} · reçu le ${when}`;
+    // The relay signs with two discreet lines: what it is, then who really
+    // sent the message and when it landed.
+    const footer_lines = [
+        "Transféré par CY Relay",
+        `Expéditeur d'origine : ${sender_line} · reçu le ${when}`
+    ];
+    const content_type = is_html ? "text/html" : "text/plain";
+    // Blank paragraphs and <br>s trailing the original body would open a gap
+    // before the relay line — strip them, down to one clean line break
+    // (peeling block closers is safe: the renderer auto-closes them, and
+    // the relay line carries its own inline styles).
+    const trim_tail = (text) => {
+        let previous;
+        do {
+            previous = text;
+            text = text
+                .replace(/(?:\s|<br\s*\/?>|&nbsp;)*$/i, "")
+                .replace(/<(\w+)([^>]*)>(?:\s|<br\s*\/?>|&nbsp;)*<\/\1>\s*$/i, "")
+                .replace(/<\/(?:div|p|body|html|table|thead|tbody|tr|td|th|font|section|o:p)>$/i, "");
+        } while (text !== previous);
+        return text;
+    };
     const content = is_html
-        ? `${full.body}<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e8e8e8;color:#9a9a9a;font-size:12px;">${footer}</div>`
-        : `${full.body}\n\n-- \n${footer}`;
+        // The sender line carries <email@host> — raw angle brackets would be
+        // swallowed by the HTML parser, so the footer text is escaped.
+        ? trim_tail(full.body) + `<div style="margin:16px 0 24px;padding-top:8px;border-top:1px solid #e8e8e8;color:#9a9a9a;font-size:12px;">${encode(footer_lines[0], { mode: "specialChars" })}<br>${encode(footer_lines[1], { mode: "specialChars" })}</div>`
+        : trim_tail(full.body) + `\n\n-- \n${footer_lines.join("\n")}`;
 
+    // The relay line closes the body itself: Zimbra drops any part placed
+    // after <attach> (tested) and merges same-type ones into the body, so
+    // a trailing-part footer would silently disappear.
     const request = '<SendMsgRequest xmlns="urn:zimbraMail"><m>' +
         `<e t="t" a="${encode(credentials.mail_notify_to, { mode: "specialChars" })}"/>` +
         `<e t="f" p="${encode(sender_names, { mode: "specialChars" })}" a="${encode(credentials.mail_address, { mode: "specialChars" })}"/>` +
         senders.filter(p => p.a).map(p => `<e t="r" a="${encode(p.a, { mode: "specialChars" })}"/>`).join("") +
         `<su>${encode(full.subject || "(no subject)", { mode: "specialChars" })}</su>` +
-        `<mp ct="${is_html ? "text/html" : "text/plain"}"><content>${encode(content, { mode: "specialChars" })}</content></mp>` +
+        `<mp ct="${content_type}"><content>${encode(content, { mode: "specialChars" })}</content></mp>` +
         (full.attachments.length
             ? "<attach>" + full.attachments.map(a => `<mp mid="${full.id}" part="${a.part}"/>`).join("") + "</attach>"
             : "") +
@@ -557,5 +611,53 @@ async function send_test_notification() {
     });
 }
 
+// Replay already-received messages through the exact same transfer path,
+// as if they had just arrived — the seen list stays untouched, so the
+// regular relay will not send them twice. Meant for manual testing.
+async function replay_messages(count) {
+    if (!credentials.mail_address || !credentials.mail_notify_to) {
+        throw new Error("MAIL_ADDRESS / MAIL_NOTIFY_TO missing in .env");
+    }
+    if (auth_is_locked()) {
+        throw new Error(`mail SSO locked — delete ${BLOCKED_FILE} to retry`);
+    }
+
+    let jar = load_cookies();
+    let inbox = await fetch_inbox(jar);
+    if (inbox.status !== 200) {
+        try {
+            jar = await sso_login_and_save();
+        } catch (error) {
+            if (error && error.code === "BAD_CREDENTIALS") lock_auth();
+            throw error;
+        }
+        inbox = await fetch_inbox(jar);
+        if (inbox.status !== 200) throw new Error(`inbox still unreachable (HTTP ${inbox.status})`);
+    }
+
+    // The feed is newest-first: take the most recent ones, replay in order.
+    const messages = inbox.messages.slice(0, Math.min(count, NOTIFY_LIMIT)).reverse();
+    if (!messages.length) {
+        log.info("inbox is empty — nothing to replay");
+        return true;
+    }
+
+    log.info(`replaying ${messages.length} message(s) already received...`);
+    let all_ok = true;
+    for (const message of messages) {
+        const full = await fetch_full_message(jar, message.id);
+        if (!full) { all_ok = false; continue; }
+        // Belt and braces: the inbox feed carries the same meta.
+        full.subject = full.subject || message.su || "";
+        full.date = full.date || message.d || "";
+        if (await forward_message(jar, token_of(jar), full)) {
+            log.info(`replayed (${full.body_type}${full.attachments.length ? ", " + full.attachments.length + " attachment(s)" : ""}): ${full.subject || "(no subject)"}`);
+        } else {
+            all_ok = false;
+        }
+    }
+    return all_ok;
+}
+
 // _debug: internals exposed for the runtime/ diagnostics (no public contract).
-module.exports = { check_mail, send_test_notification, _debug: { parse_forms, follow, submit } };
+module.exports = { check_mail, send_test_notification, replay_messages, _debug: { parse_forms, follow, submit, fetch_full_message, forward_message } };
